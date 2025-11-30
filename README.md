@@ -24,3 +24,13 @@ In order to minimize the probability of merge conflicts, the following constrain
 If we adhere to the same style guidelines, we minimize any potential friction in contributing.
 
 You must first create your own branch, create a pull request, and then merge said pull request to `main`.
+
+## Developing
+
+This project uses `uv` as a package management system. Please follow the `uv` installation instructions [here](https://docs.astral.sh/uv/#highlights), and then run
+
+```
+uv sync
+```
+
+to synchronize all dependencies.
