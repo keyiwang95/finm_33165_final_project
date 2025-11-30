@@ -24,7 +24,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Set up Dependencies
-        run: uv sync
+        run: uv tool install ruff
 
       - name: Run Ruff Check
-        run: ruff check src --output-format=github
+        run: uv run ruff check src --output-format=github

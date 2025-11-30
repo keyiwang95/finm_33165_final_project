@@ -24,7 +24,7 @@ jobs:
       uses: astral-sh/setup-uv@v7
 
     - name: Set up Dependencies
-      run: uv sync
+      run: uv tool install mypy
 
     - name: Run Mypy
-      run: mypy --strict src
+      run: uv run mypy --strict src
