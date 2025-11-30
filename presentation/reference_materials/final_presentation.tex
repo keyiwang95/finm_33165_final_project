@@ -1,0 +1,84 @@
+\documentclass{beamer}					% Document class
+
+\usepackage[english]{babel}				% Set language
+\usepackage[utf8x]{inputenc}			% Set encoding
+
+\mode<presentation>						% Set options
+{
+  \usetheme{default}					% Set theme
+  \usecolortheme{default} 				% Set colors
+  \usefonttheme{default}  				% Set font theme
+  \setbeamertemplate{caption}[numbered]	% Set caption to be numbered
+}
+
+
+\usepackage{graphicx}					% For including figures
+\usepackage{booktabs}					% For table rules
+\usepackage{hyperref}					% For cross-referencing
+
+\title{Portfolio Rebalancing\\
+with Reinforcement Learning}
+\author{Deyu Zhang, Keyi Wang, Vedant Pathak, Felix Glombitza}								% Presentation author
+\institute{FINM33165 Reinfocement and Deep Learning \\ University of Chicago}					% Author affiliation
+\date{\today}									% Today's date	
+
+\begin{document}
+
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+\begin{frame}{Outline}
+  \tableofcontents
+\end{frame}
+
+
+\section{Methodology}
+
+\begin{frame}{Literature Review}
+	This is a bullet list of two points:
+    \begin{itemize}
+		\item Point one
+        \item Point two
+	\end{itemize}
+\end{frame}
+
+\begin{frame}{Model}
+	\begin{columns}
+		\column{.5\textwidth}
+        Text goes in first column.
+        
+        \column{.5\textwidth}
+        Text goes in second column
+	\end{columns}
+\end{frame}
+
+\section{Results}
+
+\begin{frame}{Results}
+	\input{tables/table1.tex}
+\end{frame}
+
+\begin{frame}{Slide with figure}
+	\begin{figure}[H]
+		\centering
+        \includegraphics[width=.5\textwidth]{figures/figure1.png}
+        \caption{Caption for figure one.}
+        \label{fig:figure1}
+	\end{figure}
+\end{frame}
+
+\begin{frame}{Evaluation}
+
+\end{frame}
+
+\section{References}
+
+
+\begin{frame}{References}
+	\tiny\bibliography{references}
+	\bibliographystyle{apalike}
+\end{frame}
+
+\end{document}
