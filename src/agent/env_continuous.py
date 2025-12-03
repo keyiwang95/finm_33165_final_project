@@ -7,8 +7,8 @@ from gymnasium import spaces
 
 class ContinuousPortfolioEnv(gym.Env):
     """
-    连续动作版多资产组合再平衡环境：
-    - 动作为 R^N 连续向量，经归一化后作为权重。
+    Continuous-action multi-asset portfolio rebalancing environment.
+    The agent outputs a continuous vector in R^N, which is later mapped to valid portfolio weights.
     """
     metadata = {"render_modes": ["human"]}
 
@@ -23,6 +23,7 @@ class ContinuousPortfolioEnv(gym.Env):
         assert isinstance(price_df, pd.DataFrame)
         assert price_df.shape[1] >= 2
 
+        # Clean price data
         self.price_df = price_df.dropna().astype(float)
         self.assets = list(self.price_df.columns)
         self.n_assets = len(self.assets)
@@ -30,18 +31,19 @@ class ContinuousPortfolioEnv(gym.Env):
         self.window = window
         self.initial_cash = float(initial_cash)
 
-        self.prices = self.price_df.values  # (T, N)
+        self.prices = self.price_df.values            # (T, N)
         self.returns = self.prices[1:] / self.prices[:-1] - 1.0
         self.T = len(self.returns)
 
-        # state_dim 跟原来一致
+        # Same state dimension as before
         self.state_dim = (self.n_assets * 4) + 1
 
-        # ✅ 这里改成连续动作空间：每个 asset 一个动作分量
-        # 暂定范围 [-1, 1]，稍后通过 softmax / ReLU 转成合法权重
+        # Continuous action space in R^N (later normalized to valid weights)
         self.action_space = spaces.Box(
             low=-1.0, high=1.0, shape=(self.n_assets,), dtype=np.float32
         )
+
+        # Observation is an unconstrained vector
         self.observation_space = spaces.Box(
             low=-np.inf, high=np.inf, shape=(self.state_dim,), dtype=np.float32
         )
@@ -49,17 +51,25 @@ class ContinuousPortfolioEnv(gym.Env):
         self.reset()
 
     def _compute_state(self, t: int) -> np.ndarray:
-        past_returns = self.returns[t - self.window : t]  # (window, N)
+        """
+        Build the state vector using financial statistics over the past window:
+          - last return for each asset
+          - mean return over window
+          - volatility of returns over window
+          - current portfolio weights
+          - normalized portfolio value
+        """
+        past_returns = self.returns[t - self.window : t]   # (window, N)
         mean_ret = past_returns.mean(axis=0)
         vol_ret = past_returns.std(axis=0) + 1e-8
         last_ret = self.returns[t - 1]
 
         state = np.concatenate(
             [
-                last_ret,               # N
-                mean_ret,               # N
-                vol_ret,                # N
-                self.weights,           # N
+                last_ret,                                    # N
+                mean_ret,                                    # N
+                vol_ret,                                     # N
+                self.weights,                                # N
                 np.array([self.portfolio_value / self.initial_cash]),
             ],
             axis=0,
@@ -67,6 +77,9 @@ class ContinuousPortfolioEnv(gym.Env):
         return state.astype(np.float32)
 
     def reset(self, *, seed=None, options=None):
+        """
+        Reset the environment to the initial state.
+        """
         super().reset(seed=seed)
 
         self.t = self.window
@@ -79,27 +92,40 @@ class ContinuousPortfolioEnv(gym.Env):
 
     def _action_to_weights(self, action: np.ndarray) -> np.ndarray:
         """
-        将连续动作向量映射为合法权重：
-        方案一：ReLU + 归一化，允许“接近0”的仓位
+        Map a continuous action vector into valid portfolio weights.
+        Method:
+            ReLU + normalization → ensures non-negative weights summing to 1.
         """
-        # 防止全负或全零
+        # Avoid degenerate all-negative or all-zero vectors
         x = np.maximum(action, 0.0) + 1e-6
         w = x / x.sum()
         return w.astype(np.float32)
 
     def step(self, action: np.ndarray):
+        """
+        Execute a single environment step:
+          1. Convert action to weights
+          2. Compute portfolio return
+          3. Update portfolio value
+          4. Build next observation
+        """
         assert self.action_space.contains(action.astype(np.float32))
 
-        # ✅ 将连续动作转权重
+        # Convert raw action into weights
         self.weights = self._action_to_weights(action)
 
+        # Portfolio return for this step
         asset_rets = self.returns[self.t]      # shape (N,)
         port_ret = np.dot(self.weights, asset_rets)
+
+        # Update portfolio value
         prev_value = self.portfolio_value
         self.portfolio_value *= (1.0 + port_ret)
 
+        # Reward = change in portfolio value (can later be modified to log-return)
         reward = self.portfolio_value - prev_value
 
+        # Advance time index
         self.t += 1
         terminated = self.t >= self.T
         truncated = False
@@ -107,12 +133,19 @@ class ContinuousPortfolioEnv(gym.Env):
         if not terminated:
             obs = self._compute_state(self.t)
         else:
+            # At termination, keep the last observation
             obs = self._last_obs
 
         self._last_obs = obs
-        return obs, reward, terminated, truncated, {"portfolio_value": float(self.portfolio_value)}
+
+        return obs, reward, terminated, truncated, {
+            "portfolio_value": float(self.portfolio_value)
+        }
 
     def render(self):
+        """
+        Print the current portfolio state.
+        """
         print(
             f"t={self.t}, "
             f"portfolio_value={self.portfolio_value:.2f}, "

@@ -12,7 +12,7 @@ from .env_continuous import ContinuousPortfolioEnv
 def run_backtest():
 
     # -----------------------------
-    # 1. 加载数据
+    # 1. Load price data
     # -----------------------------
     project_root = Path(__file__).resolve().parents[1]
     price_path = project_root / "price_data.pkl"
@@ -20,6 +20,7 @@ def run_backtest():
     price_df = pickle.load(open(price_path, "rb"))
     price_df = price_df.dropna()
 
+    # Use selected assets
     selected_cols = [
         ('Open', 'AAPL'),
         ('Open', 'AMZN'),
@@ -31,14 +32,14 @@ def run_backtest():
     n_assets = price_df.shape[1]
 
     # -----------------------------
-    # 2. 创建环境
+    # 2. Create environment
     # -----------------------------
     env = ContinuousPortfolioEnv(price_df=price_df, window=20)
 
     obs, _ = env.reset()
 
     # -----------------------------
-    # 3. 初始化 agent 并加载模型参数
+    # 3. Initialize SAC agent & load model weights
     # -----------------------------
     agent = SACAgent(
         state_dim=env.state_dim,
@@ -49,14 +50,14 @@ def run_backtest():
     agent.load(model_path)
 
     # -----------------------------
-    # 4. 回测（完全 deterministic，不加噪声）
+    # 4. Deterministic evaluation (no exploration noise)
     # -----------------------------
     done = False
     equity_curve = []
     weights_history = []
 
     while not done:
-        action = agent.select_action(obs, eval_mode=True)  # 不加噪声
+        action = agent.select_action(obs, eval_mode=True)  # deterministic action
         obs, _, terminated, truncated, info = env.step(action)
         done = terminated or truncated
 
@@ -64,7 +65,7 @@ def run_backtest():
         weights_history.append(env.weights.copy())
 
     # -----------------------------------------------------
-    # 5) 计算 Sharpe / MaxDD / CAGR / Calmar，并保存到 metrics_sac.txt
+    # 5. Compute Sharpe / MaxDD / CAGR / Calmar and save to metrics_sac.txt
     # -----------------------------------------------------
     equity_curve = np.array(equity_curve)
     peak = np.maximum.accumulate(equity_curve)
@@ -75,11 +76,11 @@ def run_backtest():
 
     max_dd = drawdown.min()
 
-    years = len(equity_curve) / 252  # 按 252 个交易日算 1 年
+    years = len(equity_curve) / 252  # assume 252 trading days per year
     CAGR = (equity_curve[-1] / equity_curve[0]) ** (1 / years) - 1
     calmar = CAGR / abs(max_dd) if max_dd != 0 else np.inf
 
-    project_root = Path(__file__).resolve().parents[2]   # FINAL_PROJECT/
+    project_root = Path(__file__).resolve().parents[2]  # FINAL_PROJECT/
     results_dir = project_root / "results_sac"
     results_dir.mkdir(exist_ok=True)
 
@@ -94,7 +95,7 @@ def run_backtest():
     print(f"SAC backtest metrics saved to {metrics_path}")
 
     # -----------------------------
-    # 6. plot result
+    # 6. Plot results
     # -----------------------------
     plt.plot(equity_curve)
     plt.title("Equity Curve (Loaded SAC Model)")
@@ -111,4 +112,3 @@ def run_backtest():
 
 if __name__ == "__main__":
     run_backtest()
-

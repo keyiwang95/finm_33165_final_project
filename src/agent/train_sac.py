@@ -96,7 +96,7 @@ def train_sac(
             f"Pi_loss: {policy_loss_per_episode[-1]:.4f}"
         )
 
-    # 画训练曲线
+    # Plot training curves
     plt.plot(rewards_per_episode)
     plt.title("SAC Episode Reward")
     plt.xlabel("Episode")
@@ -115,7 +115,7 @@ def train_sac(
     plt.ylabel("Policy Loss")
     save_plot("sac_policy_loss")
 
-    # 最终回测（贪心：使用 deterministic 策略）
+    # Final backtest (greedy mode using deterministic policy)
     obs, _ = env.reset()
     done = False
     equity_curve = []
@@ -134,7 +134,7 @@ def train_sac(
     peak = np.maximum.accumulate(equity_curve)
     drawdown_curve = (equity_curve - peak) / peak
 
-    # 曲线图（和 DDQN 基本一样）
+    # Final performance plots (same as DDQN version)
     plt.plot(equity_curve)
     plt.title("SAC Final Equity Curve")
     plt.xlabel("Time")
@@ -156,25 +156,25 @@ def train_sac(
     save_plot("sac_drawdown_curve")
 
     print("SAC training & backtest finished.")
+
     # ========================
-    project_root = Path(__file__).resolve().parents[1]  # src/ 上一级（FINAL_PROJECT）
+    # Save SAC model and weight history
+    # ========================
+    project_root = Path(__file__).resolve().parents[1]  # One level above src/ (FINAL_PROJECT)
     save_dir = project_root / "saved_models"
     save_dir.mkdir(exist_ok=True)
 
-    # 保存 SAC 模型参数
-    model_path = save_dir / "sac_portfolio_model2.pth"
+    # Save SAC model parameters
+    model_path = save_dir / "sac_portfolio_model.pth"
     agent.save(model_path)
     
-    # 保存权重变动记录 (weights_history)
+    # Save portfolio weight history (weights_history)
     # ============================
     weights_history = np.array(weights_history)  # list -> numpy array
     weights_path = save_dir / "weights_history.npy"
     np.save(weights_path, weights_history)
 
     print(f"Weights history saved to {weights_path}")
-
-    
-
 
 if __name__ == "__main__":
     train_sac()
