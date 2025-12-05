@@ -42,9 +42,9 @@ def train_sac(
     # Select specific assets
     selected_cols = [
         ("Open", "AAPL"),
-        ("Open", "AMZN"),
-        ("Open", "AMD"),
-        ("Open", "BAC"),
+        ("Open", "ABT"),
+        ("Open", "MU"),
+        ("Open", "SO"),
     ]
     price_df = price_df[selected_cols]
 

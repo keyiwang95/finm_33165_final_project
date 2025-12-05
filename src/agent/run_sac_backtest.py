@@ -30,9 +30,9 @@ def run_backtest() -> None:
     # Use selected assets
     selected_cols = [
         ("Open", "AAPL"),
-        ("Open", "AMZN"),
-        ("Open", "AMD"),
-        ("Open", "BAC"),
+        ("Open", "ABT"),
+        ("Open", "MU"),
+        ("Open", "SO"),
     ]
     price_df = price_df[selected_cols]
 
@@ -103,8 +103,27 @@ def run_backtest() -> None:
 
     print(f"SAC backtest metrics saved to {metrics_path}")
 
+    # -----------------------------------------------------
+    # 6. Save weights/positions history to CSV & Excel
+    # -----------------------------------------------------
+    weights_arr = np.array(weights_history)  # shape (T, n_assets)
+    df_weights = pd.DataFrame(
+        weights_arr,
+        columns=[str(col) for col in env.assets]
+    )
+    df_weights["PortfolioValue"] = equity_curve
+
+    weights_csv_path = results_dir / "sac_weights_history.csv"
+    weights_excel_path = results_dir / "sac_weights_history.xlsx"
+
+    df_weights.to_csv(weights_csv_path, index=False)
+    df_weights.to_excel(weights_excel_path, index=False)
+
+    print(f"Weights history saved to:\n  {weights_csv_path}\n  {weights_excel_path}")
+
+
     # -----------------------------
-    # 6. Plot results
+    # 7. Plot results
     # -----------------------------
     plt.plot(equity_curve)
     plt.title("Equity Curve (Loaded SAC Model)")
