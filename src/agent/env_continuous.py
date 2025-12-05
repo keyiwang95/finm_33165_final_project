@@ -3,7 +3,7 @@ import gymnasium as gym
 import numpy as np
 import pandas as pd
 from gymnasium import spaces
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, cast
 from numpy.typing import NDArray
 
 
@@ -37,7 +37,9 @@ class ContinuousPortfolioEnv(gym.Env[ObsType, ActType]):
         self.window: int = window
         self.initial_cash: float = float(initial_cash)
 
-        self.prices: NDArray[np.float32] = self.price_df.values.astype(np.float32)  # (T, N)
+        self.prices: NDArray[np.float32] = self.price_df.values.astype(
+            np.float32
+        )  # shape (T, N)
         self.returns: NDArray[np.float32] = (
             self.prices[1:] / self.prices[:-1] - 1.0
         )
@@ -56,7 +58,7 @@ class ContinuousPortfolioEnv(gym.Env[ObsType, ActType]):
             low=-np.inf, high=np.inf, shape=(self.state_dim,), dtype=np.float32
         )
 
-        # 初始化环境状态
+        # Initialize environment state
         self.t: int = 0
         self.portfolio_value: float = self.initial_cash
         self.weights: NDArray[np.float32] = np.zeros(
@@ -77,22 +79,29 @@ class ContinuousPortfolioEnv(gym.Env[ObsType, ActType]):
           - current portfolio weights
           - normalized portfolio value
         """
-        past_returns: NDArray[np.float32] = self.returns[t - self.window : t]   # (window, N)
+        past_returns: NDArray[np.float32] = self.returns[
+            t - self.window : t
+        ]  # shape (window, N)
         mean_ret: NDArray[np.float32] = past_returns.mean(axis=0)
         vol_ret: NDArray[np.float32] = past_returns.std(axis=0) + 1e-8
         last_ret: NDArray[np.float32] = self.returns[t - 1]
 
         state = np.concatenate(
             [
-                last_ret,                                    # N
-                mean_ret,                                    # N
-                vol_ret,                                     # N
-                self.weights,                                # N
-                np.array([self.portfolio_value / self.initial_cash], dtype=np.float32),
+                last_ret,  # N
+                mean_ret,  # N
+                vol_ret,  # N
+                self.weights,  # N
+                np.array(
+                    [self.portfolio_value / self.initial_cash],
+                    dtype=np.float32,
+                ),
             ],
             axis=0,
         )
-        return state.astype(np.float32)
+
+        # Help mypy: ensure this is seen as NDArray[np.float32]
+        return cast(NDArray[np.float32], state.astype(np.float32))
 
     def reset(
         self,
@@ -122,7 +131,8 @@ class ContinuousPortfolioEnv(gym.Env[ObsType, ActType]):
         # Avoid degenerate all-negative or all-zero vectors
         x = np.maximum(action, 0.0) + 1e-6
         w = x / x.sum()
-        return w.astype(np.float32)
+
+        return cast(NDArray[np.float32], w.astype(np.float32))
 
     def step(
         self,
@@ -142,14 +152,14 @@ class ContinuousPortfolioEnv(gym.Env[ObsType, ActType]):
         self.weights = self._action_to_weights(action_np)
 
         # Portfolio return for this step
-        asset_rets: NDArray[np.float32] = self.returns[self.t]      # shape (N,)
+        asset_rets: NDArray[np.float32] = self.returns[self.t]  # shape (N,)
         port_ret: float = float(np.dot(self.weights, asset_rets))
 
         # Update portfolio value
         prev_value: float = self.portfolio_value
-        self.portfolio_value *= (1.0 + port_ret)
+        self.portfolio_value *= 1.0 + port_ret
 
-        # Reward = change in portfolio value (可以之后改成 log-return)
+        # Reward = change in portfolio value (could be changed to log-return)
         reward: float = self.portfolio_value - prev_value
 
         # Advance time index

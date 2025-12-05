@@ -4,6 +4,7 @@ from collections import deque
 from typing import Deque, Tuple, NamedTuple, Sequence
 
 import numpy as np
+from numpy.typing import NDArray
 import torch
 
 
@@ -18,10 +19,10 @@ class Transition(NamedTuple):
         - next_state:  observation after the action
         - done:        whether the episode ended (1.0) or not (0.0)
     """
-    state: np.ndarray
-    action: np.ndarray
+    state: NDArray[np.float32]
+    action: NDArray[np.float32]
     reward: float
-    next_state: np.ndarray
+    next_state: NDArray[np.float32]
     done: float
 
 
@@ -38,10 +39,10 @@ class ReplayBufferContinuous:
 
     def push(
         self,
-        state: np.ndarray,
-        action: np.ndarray,
+        state: NDArray[np.float32],
+        action: NDArray[np.float32],
         reward: float,
-        next_state: np.ndarray,
+        next_state: NDArray[np.float32],
         done: float,
     ) -> None:
         """
@@ -67,24 +68,28 @@ class ReplayBufferContinuous:
         # batch is a list of Transition objects
         batch: Sequence[Transition] = random.sample(self.buffer, batch_size)
 
-        # "Transpose" the batch: group all states, all actions, etc.
-        batch_t: Transition = Transition(*zip(*batch))
+        # Build numpy arrays explicitly; this is mypy- and numpy-stub-friendly
+        states_np: NDArray[np.float32] = np.stack(
+            [tr.state for tr in batch], axis=0
+        )
+        actions_np: NDArray[np.float32] = np.stack(
+            [tr.action for tr in batch], axis=0
+        )
+        rewards_np: NDArray[np.float32] = np.asarray(
+            [tr.reward for tr in batch], dtype=np.float32
+        )
+        next_states_np: NDArray[np.float32] = np.stack(
+            [tr.next_state for tr in batch], axis=0
+        )
+        dones_np: NDArray[np.float32] = np.asarray(
+            [tr.done for tr in batch], dtype=np.float32
+        )
 
-        states = torch.tensor(
-            np.stack(batch_t.state), dtype=torch.float32
-        )
-        actions = torch.tensor(
-            np.stack(batch_t.action), dtype=torch.float32
-        )
-        rewards = torch.tensor(
-            batch_t.reward, dtype=torch.float32
-        ).unsqueeze(1)
-        next_states = torch.tensor(
-            np.stack(batch_t.next_state), dtype=torch.float32
-        )
-        dones = torch.tensor(
-            batch_t.done, dtype=torch.float32
-        ).unsqueeze(1)
+        states = torch.tensor(states_np, dtype=torch.float32)
+        actions = torch.tensor(actions_np, dtype=torch.float32)
+        rewards = torch.tensor(rewards_np, dtype=torch.float32).unsqueeze(1)
+        next_states = torch.tensor(next_states_np, dtype=torch.float32)
+        dones = torch.tensor(dones_np, dtype=torch.float32).unsqueeze(1)
 
         return states, actions, rewards, next_states, dones
 

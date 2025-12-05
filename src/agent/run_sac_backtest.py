@@ -54,7 +54,7 @@ def run_backtest() -> None:
     )
 
     model_path = project_root / "saved_models" / "sac_portfolio_model.pth"
-    agent.load(str(model_path))  # cast Path -> str for mypy
+    agent.load(str(model_path))  # Path -> str
 
     # -----------------------------
     # 4. Deterministic evaluation (no exploration noise)
@@ -75,12 +75,12 @@ def run_backtest() -> None:
     # -----------------------------------------------------
     # 5. Compute Sharpe / MaxDD / CAGR / Calmar and save to metrics_sac.txt
     # -----------------------------------------------------
-    equity_curve: NDArray[np.float32] = np.array(equity_values, dtype=np.float32)
+    equity_curve: NDArray[np.float64] = np.array(equity_values, dtype=np.float64)
 
-    peak: NDArray[np.float32] = np.maximum.accumulate(equity_curve)
-    drawdown: NDArray[np.float32] = (equity_curve - peak) / peak
+    peak: NDArray[np.float64] = np.maximum.accumulate(equity_curve)
+    drawdown: NDArray[np.float64] = (equity_curve - peak) / peak
 
-    returns: NDArray[np.float32] = np.diff(equity_curve) / equity_curve[:-1]
+    returns: NDArray[np.float64] = np.diff(equity_curve) / equity_curve[:-1]
     sharpe: float = float(np.mean(returns) / (np.std(returns) + 1e-8))
 
     max_dd: float = float(drawdown.min())
