@@ -1,5 +1,9 @@
 # train_sac.py
-import pickle
+"""
+Train a Soft Actor–Critic (SAC) agent on portfolio allocation
+using price data loaded from open_prices.parquet.
+"""
+
 from pathlib import Path
 from typing import List
 
@@ -8,60 +12,103 @@ import numpy as np
 import pandas as pd
 from numpy.typing import NDArray
 
+# Import environment and SAC agent modules
 from .env_continuous import ContinuousPortfolioEnv
 from .sac_agent import SACAgent
+
+# Import TICKERS from src/constants.py
+# Directory structure:
+#   src/constants.py
+#   src/agent/train_sac.py   → need to go up one level
+from ..constants import TICKERS
 
 
 def save_plot(fn: str) -> None:
     """
-    Save the current Matplotlib figure under results_sac/plots/{fn}.png.
+    Save the current Matplotlib figure inside results_sac/plots/{fn}.png.
+    Ensures the directory exists before saving.
     """
     plt.tight_layout()
     project_root = Path(__file__).resolve().parents[2]
-    save_dir = project_root / "results_sac" / "plots"
+    save_dir = project_root / "results_sac" / "new_plots"
     save_dir.mkdir(parents=True, exist_ok=True)
     plt.savefig(save_dir / f"{fn}.png", dpi=200)
     plt.close()
 
 
 def train_sac(
-    price_path: str = "price_data.pkl",
+    price_path: str = "open_prices.parquet",
     num_episodes: int = 50,
 ) -> None:
     """
-    Train a SAC agent on the given price dataset and run a final deterministic backtest.
-    Training curves and final performance plots are saved to results_sac/plots,
-    and the trained model plus weights history are saved under saved_models/.
+    Train a SAC agent using a given price dataset (.parquet),
+    then run a deterministic backtest and save performance plots.
     """
+
+    # ---------------------------------------------------------
+    # 1) Load price data from open_prices.parquet
+    # ---------------------------------------------------------
     price_path_path = Path(price_path)
     assert price_path_path.exists(), f"{price_path_path} does not exist."
 
-    price_df: pd.DataFrame = pickle.load(open(price_path_path, "rb"))
+    # Load parquet file
+    price_df: pd.DataFrame = pd.read_parquet(price_path_path)
+
+    # Ensure the index is a DatetimeIndex
+    if "date" in price_df.columns:
+        price_df["date"] = pd.to_datetime(price_df["date"])
+        price_df = price_df.set_index("date")
+    else:
+        price_df.index = pd.to_datetime(price_df.index)
+
+    price_df = price_df.sort_index()
     price_df = price_df.dropna()
 
-    # Select specific assets
-    selected_cols = [
-        ("Open", "AAPL"),
-        ("Open", "ABT"),
-        ("Open", "MU"),
-        ("Open", "SO"),
-    ]
+    # ---------------------------------------------------------
+    # 2) Select only tickers defined in constants.TICKERS
+    # ---------------------------------------------------------
+    # Example: TICKERS = ["NVDA", "LLY", "JPM", "CAT"]
+    selected_cols = [t for t in TICKERS if t in price_df.columns]
+
+    assert (
+        len(selected_cols) > 0
+    ), "None of the tickers listed in TICKERS are present in the dataset."
+
     price_df = price_df[selected_cols]
 
+    # ---------------------------------------------------------
+    # 3) Restrict data to dates up to December 31, 2022
+    # ---------------------------------------------------------
+    cutoff = pd.Timestamp("2022-12-31")
+    price_df = price_df.loc[price_df.index <= cutoff]
+
+    # Remove any remaining missing values
+    price_df = price_df.dropna()
+
+    # Number of assets after filtering
     n_assets: int = price_df.shape[1]
 
-    # Environment
+    # ---------------------------------------------------------
+    # 4) Initialize training environment
+    # ---------------------------------------------------------
+    # The environment handles:
+    # - State construction (past window of prices)
+    # - Action interpretation as portfolio weights
+    # - Portfolio value evolution
     env: ContinuousPortfolioEnv = ContinuousPortfolioEnv(
         price_df=price_df,
-        window=20,
-        initial_cash=1_000_000.0,
+        window=20,               # number of past days in the observation
+        initial_cash=1_000_000.0 # starting capital
     )
 
+    # Get dimension of the observation space
     sample_obs, _ = env.reset()
     state_dim: int = sample_obs.shape[0]
     action_dim: int = n_assets
 
-    # SAC agent
+    # ---------------------------------------------------------
+    # 5) Create SAC agent (policy + value networks)
+    # ---------------------------------------------------------
     agent = SACAgent(
         state_dim=state_dim,
         action_dim=action_dim,
@@ -79,9 +126,9 @@ def train_sac(
     q_loss_per_episode: List[float] = []
     policy_loss_per_episode: List[float] = []
 
-    # ========================
-    # Training loop
-    # ========================
+    # ---------------------------------------------------------
+    # 6) Training loop (episodes)
+    # ---------------------------------------------------------
     for ep in range(num_episodes):
         obs, _ = env.reset()
         done: bool = False
@@ -205,7 +252,7 @@ def train_sac(
     save_dir.mkdir(exist_ok=True)
 
     # Save SAC model parameters
-    model_path = save_dir / "sac_portfolio_model.pth"
+    model_path = save_dir / "sac_portfolio_model2.pth"
     agent.save(str(model_path))
 
     # Save portfolio weight history

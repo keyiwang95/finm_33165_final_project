@@ -1,15 +1,16 @@
 # run_sac_backtest.py
 
-import pickle
 from pathlib import Path
 from typing import List
 
 import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 from numpy.typing import NDArray
 
 from .env_continuous import ContinuousPortfolioEnv
 from .sac_agent import SACAgent
+from ..constants import TICKERS   # TICKERS = ["NVDA", "LLY", "JPM", "CAT"]
 
 
 def run_backtest() -> None:
@@ -21,20 +22,42 @@ def run_backtest() -> None:
     # -----------------------------
     # 1. Load price data
     # -----------------------------
-    project_root = Path(__file__).resolve().parents[1]
-    price_path = project_root / "price_data.pkl"
+    # project_root points to src/ (one level above agent/)
+    project_root = Path(__file__).resolve().parents[2]
+    price_path = project_root / "open_prices.parquet"
 
-    price_df = pickle.load(open(price_path, "rb"))
+    assert price_path.exists(), f"{price_path} does not exist."
+
+    # Read price data from parquet
+    price_df: pd.DataFrame = pd.read_parquet(price_path)
+
+    # Ensure DatetimeIndex
+    if "date" in price_df.columns:
+        price_df["date"] = pd.to_datetime(price_df["date"])
+        price_df = price_df.set_index("date")
+    else:
+        price_df.index = pd.to_datetime(price_df.index)
+
+    price_df = price_df.sort_index()
     price_df = price_df.dropna()
 
-    # Use selected assets
-    selected_cols = [
-        ("Open", "AAPL"),
-        ("Open", "ABT"),
-        ("Open", "MU"),
-        ("Open", "SO"),
-    ]
+    # -----------------------------
+    # 1.1 Filter tickers and date range
+    # -----------------------------
+    # Use only tickers defined in constants.TICKERS
+    selected_cols = [t for t in TICKERS if t in price_df.columns]
+    assert (
+        len(selected_cols) > 0
+    ), "None of the tickers listed in TICKERS are present in the dataset."
+
     price_df = price_df[selected_cols]
+
+    # Use only data up to 2022-12-31
+    cutoff = pd.Timestamp("2022-12-31")
+    price_df = price_df.loc[price_df.index <= cutoff]
+
+    # Drop any remaining NaNs
+    price_df = price_df.dropna()
 
     n_assets = price_df.shape[1]
 
@@ -53,7 +76,11 @@ def run_backtest() -> None:
         action_dim=n_assets,
     )
 
-    model_path = project_root / "saved_models" / "sac_portfolio_model.pth"
+    # models_root points to src/ (the same place where train_sac.py saved the model)
+    models_root = Path(__file__).resolve().parents[1]  # .../src
+    model_path = models_root / "saved_models" / "sac_portfolio_model2.pth"
+
+    assert model_path.exists(), f"{model_path} does not exist."
     agent.load(str(model_path))  # Path -> str
 
     # -----------------------------
@@ -89,8 +116,9 @@ def run_backtest() -> None:
     CAGR: float = float((equity_curve[-1] / equity_curve[0]) ** (1.0 / years) - 1.0)
     calmar: float = CAGR / abs(max_dd) if max_dd != 0.0 else float("inf")
 
-    project_root_final = Path(__file__).resolve().parents[2]  # FINAL_PROJECT/
-    results_dir = project_root_final / "results_sac"
+    # project_root_final points to FINAL_PROJECT/ (two levels above agent/)
+    project_root_final = Path(__file__).resolve().parents[2]
+    results_dir = project_root_final / "results_sac" / "new_plots"
     results_dir.mkdir(exist_ok=True)
 
     metrics_path = results_dir / "metrics_sac.txt"
@@ -121,7 +149,6 @@ def run_backtest() -> None:
 
     print(f"Weights history saved to:\n  {weights_csv_path}\n  {weights_excel_path}")
 
-
     # -----------------------------
     # 7. Plot results
     # -----------------------------
@@ -140,3 +167,4 @@ def run_backtest() -> None:
 
 if __name__ == "__main__":
     run_backtest()
+
