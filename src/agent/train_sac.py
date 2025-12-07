@@ -19,8 +19,7 @@ from .sac_agent import SACAgent
 # Import TICKERS from src/constants.py
 # Directory structure:
 #   src/constants.py
-#   src/agent/train_sac.py   → need to go up one level
-from ..constants import TICKERS
+from src.constants import TICKERS
 
 
 def save_plot(fn: str) -> None:

@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 
 from .env_continuous import ContinuousPortfolioEnv
 from .sac_agent import SACAgent
-from ..constants import TICKERS   # TICKERS = ["NVDA", "LLY", "JPM", "CAT"]
+from src.constants import TICKERS   # TICKERS = ["NVDA", "LLY", "JPM", "CAT"]
 
 
 def run_backtest() -> None:
